@@ -2,6 +2,7 @@
 .vscode
 */__pycache__
 tests/test_access.py
+tests/main.py
 unicodecam/__curses_win_content.py
 *.ucimg
 *.uccimg
