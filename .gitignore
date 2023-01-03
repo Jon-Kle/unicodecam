@@ -1,8 +1,7 @@
 *.txt
 .vscode
 */__pycache__
-tests/test_access.py
-tests/main.py
+tests/*
 unicodecam/__curses_win_content.py
 *.ucimg
 *.uccimg
