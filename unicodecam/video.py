@@ -11,16 +11,12 @@ class Video:
     '''
     A class to create an ascii video.
     '''
-    # gather data till a frame gets finished
-    # at finish the time will be taken in seconds
-    # if no time has been take before, the time command will be ignored
-    # else add the time command to the start of the frame
     def __init__(self, name:str=''):
-        self.name = name
-        self.last_frame = None
-        self.last_time = None # has to be initialized before the first frame finishes
-        self.current_frame_data = []
-        self.data =  ''
+        self.name = name # filename without extension
+        self.current_frame_data = [] # gathered snippets of the current frame
+        self.data = '' # processed recording data
+        self.last_frame = None # set after first frame has finished
+        self.last_time = None # set before first frame finishes
 
         # statistics
         self.total_time = 0
@@ -30,8 +26,6 @@ class Video:
         '''
         Add data to current frame.
         '''
-        if self.last_time is None:
-            self.last_time = time.time()
         self.current_frame_data.append(data)
 
     def finish_frame(self):
@@ -39,31 +33,31 @@ class Video:
         Finish current frame and save it.
         '''
         now = time.time()
-        current_frame_data = ''.join(self.current_frame_data)
+        current_frame = ''.join(self.current_frame_data)
         if self.last_frame is None:
-            frame = current_frame_data
+            frame = current_frame
             header = ''
-            # print('took the first route')
+            self.last_time = now
         else:
-            # print('took the second route')
             # compare with previous frame
-            frame = compare(current_frame_data, self.last_frame)
-            # get the time difference between frames
+            frame = compare(current_frame, self.last_frame)
+            
+            # time difference between frames
             time_diff = now - self.last_time
+            time_diff_cmd = create_cmd('t', str(time_diff))
+
+            self.total_time += time_diff # statistics
             self.last_time = now
 
-            time_diff_cmd = create_cmd('t', str(time_diff))
-            self.total_time += time_diff # statistics
-            header = RS + time_diff_cmd
+            # assemble header
+            header = f'{RS}\n{time_diff_cmd}'
 
         # compress and assemble frame
         finished_frame = header + compress(frame)
         self.data += finished_frame
 
-        self.last_frame = current_frame_data
-        # print('this is the last frame after everything:', self.last_frame)
-        self.last_time = now
-        self.current_frame_data = []
+        self.last_frame = current_frame
+        self.current_frame_data.clear()
         self.frame_count += 1
 
     def add_frame(self, data:str):
@@ -77,13 +71,20 @@ class Video:
         '''
         Finish video.
         '''
-        # add metadata (timestamp)
-        metadata_str = f'Total time: {self.total_time}s\n'\
-            f'Total frames: {self.frame_count}\n'\
+        # add metadata
+        timestamp = get_timestamp(invert=True)
+        duration = self.total_time
+        row_count = self.last_frame.count('\n')
+        column_count = len(self.last_frame)//row_count-1 # -1 because \n does not count
+        fps = round(self.frame_count/self.total_time, 1)
+        metadata_str = f'\ntime: {timestamp}'\
+            f'\nduration: {duration}s'\
+            f'\nformat: {column_count}x{row_count} (width, height)'\
+            f'\nframes: {self.frame_count}'\
+            f'\nfps: {fps}\n'
             # add format and average fps
 
         metadata = create_cmd('M', metadata_str)
-        print(repr(metadata))
         # assemble
         self.data = ''.join([metadata, self.data])
         filename = get_filename(self.name)
@@ -98,40 +99,35 @@ def get_filename(name:str) -> str:
 
     If a name is given, the standard name and the timestamp will be replaced by it.
     '''
-    
-    timestamp = ''
-
-    # if name is empty, set name and timestamp to be used in the filename
+    name_parts = [
+        name, # name
+        '', # timestamp
+        '', # file number (optional)
+        '.ucvid' # file extension
+    ]
+    # if no filename is given
     if name == '':
-        name = 'unicodecam_'
-        # generate a timestamp for the filename
-        timestamp = get_timestamp()
-
-    # optional filename extension if file already exists
+        name_parts[0], name_parts[1] = 'unicodecam_', get_timestamp()
+    # for distinguishing files with the same name
     file_num = 0
-    file_num_str = ''
-
-    file_ext = '.ucvid'
-
+    # for not creating multiple files with the same name 
     while True:
-        filename = name + timestamp + file_num_str + file_ext
+        filename = ''.join(name_parts)
         if not os.path.exists(filename):
             return filename
         else:
             file_num += 1
-            file_num_str = f'({file_num})'
+            name_parts[2] = f'({file_num})'
 
 def compare(frame:str, last:str) -> str:
-    # if they are not of equal length, raise exception
+
+    # for color support
     # raw_frame = re.sub(r'\x1b[^m]*m', '', frame)
     # raw_last = re.sub(r'\x1b[^m]*m', '', last)
     # len_frame = len([c for c in frame if ord(c) > 31 or ord(c) == 9])
     # len_last = len([c for c in last if ord(c) > 31 or ord(c) == 9])
+
     if len(frame) != len(last):
-    # if len(raw_frame) != len(raw_last):
-        print(len(frame), len(last))
-        # print(frame)
-        # print(last)
         raise FrameSizeError('The new frame must be of equal length as the last frame')
     
     jump_count = 0
@@ -165,4 +161,3 @@ def compare(frame:str, last:str) -> str:
                 result += last[-jump_count:]
 
     return result
-

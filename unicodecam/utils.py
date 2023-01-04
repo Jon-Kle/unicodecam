@@ -91,12 +91,15 @@ def read_cmd(text:str) -> tuple:
     length = i
     return cmd, arg, length
 
-def get_timestamp() -> str:
+def get_timestamp(invert:bool=False) -> str:
     '''
         Return a timestamp from year, month, day, hour, minute and second.
         '''
     # create filename timestamp
     timestamp = time.time()
     timestamp = datetime.fromtimestamp(timestamp)
-    timestamp = timestamp.strftime('%Y.%m.%d_%H:%M:%S')
+    if not invert:
+        timestamp = timestamp.strftime('%Y.%m.%d_%H:%M:%S')
+    else:
+        timestamp = timestamp.strftime('%H:%M:%S %d.%m.%Y')
     return timestamp
